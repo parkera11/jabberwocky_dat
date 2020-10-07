@@ -1,0 +1,413 @@
+---
+title: "Depth and breadth of bilateral language lateralisation in right and left handers"
+author: "Adam Parker"
+date: "06/10/2020"
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+[Karlsson, Johnstone, and Carey (2019)](https://doi.org/10.1080/1357650X.2019.1652308) examined the depth (i.e. how biased) and the breadth (i.e. how many) of lateralisation in right handers and non-right handers across a variety of perceptual tasks. They reported reduced typical biases in non-right handers for chimeric faces and for CV dichotic listening tasks. In this markdown file we compare the depth and breadth of lateralisation in right and left handers for a number of language tasks. These language tasks vary in the degree to which they are lateralised at the population level. 
+
+*Note*. Throughout this document fTCD refers to functional transcranial doppler ultrasound, which measures lateralised cerebral blood flow (for a description see [Bishop, Badcock, & Holt, 2010](https://www.jove.com/t/2161/assessment-cerebral-lateralization-children-using-functional))
+
+```{r setup, echo- FALSE, include= FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# packages
+library(ggplot2)
+library(dplyr)
+library(osfr)
+```
+
+### Jabberwocky
+
+First, we explore the depth and the breadth of assymetry for the Jabberwocky data reported by [Woodhead, Thompson, Karlsson, and Bishop (2020)](https://psyarxiv.com/mrkgf/). Woodhead et al. had 74 participants (43 right handers) complete the Jabberwocky task twice on two occasions under fTCD. The task itself requires participants to make a syntactic decision and judge whether a sequence of words and non-words formed a plausible ‘jabberwocky’ sentence with correct syntactic structure. 
+
+We compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples *t*-tests. We then compare the proportions of left vs. right lateralisation in left and right handers in both data sets using a series of *z*-tests. We apply a bonferroni adjustment to these NHST to correct for mulitple comparions.
+
+```{r prep.jabber, echo- FALSE, include= FALSE}
+# This recycles the code used in Woodhead et al. RSOS update
+
+# P level info
+
+# get the data for sample info
+osf_retrieve_file("https://osf.io/5jt6q") %>% osf_download(conflicts = "skip") # A2_Participant_Info.csv
+  particdat_A2    <- read.csv("A2_Participant_Info.csv")
+osf_retrieve_file("https://osf.io/534jc") %>% osf_download(conflicts = "skip") # A2_Participant_Info_Bangor.csv
+  particdat_Bangor    <- read.csv("A2_Participant_Info_Bangor.csv")
+# mark incomplete  
+incomplete <- which(particdat_Bangor$Complete == 0)
+nincomplete <- length(incomplete)
+cat(paste(nincomplete, " incomplete datasets excluded from analysis"))
+particdat_Bangor <- particdat_Bangor[-incomplete, ]
+# assign new info
+new_subjects <- length(particdat_Bangor$ID)
+new_group_info <- particdat_Bangor %>% group_by(handedness) %>% summarise(n=n())
+cat(paste("\nCompete datasets from Bangor by group: "))
+new_group_info
+# Merge both datasets
+particdat <- rbind(particdat_A2[,c(1:4)], particdat_Bangor[,c(1:4)])
+rhanded <- which(particdat$handedness == "R")
+# Create variable "handcode", needed when numeric value used for colour in plots
+particdat$handcode <- 2
+particdat$handcode[rhanded] <- 1
+n_full_subj <- length(particdat$ID)
+
+# LI data
+
+#Check to see if Results files (from A2_Combined_doppler_analysis.R) are present in directory. If not, download from OSF
+#osf_retrieve_file("https://osf.io/ntjea") %>% osf_download(conflicts = "skip") # Results_Combined_Session1.csv
+  data1    <- read.csv("Results_Combined_Session1.csv")
+#osf_retrieve_file("https://osf.io/nstq9") %>% osf_download(conflicts = "skip") # Results_Combined_Session2.csv
+  data2    <- read.csv("Results_Combined_Session2.csv")
+
+# Only take the participants included in particdat (allows you to drop subjects by handedness, and omits incomplete subjects)
+data1 <- data1[which(data1$Filename %in% particdat$ID), ] 
+data2 <- data2[which(data2$Filename %in% particdat$ID), ] 
+
+# Combine all LI data
+alltask <- cbind(dplyr::select(data1, A1.mean_LI, B1.mean_LI, C1.mean_LI, D1.mean_LI, E1.mean_LI, F1.mean_LI),
+                 dplyr::select(data2, A2.mean_LI, B2.mean_LI, C2.mean_LI, D2.mean_LI, E2.mean_LI, F2.mean_LI))
+
+allN <- cbind(dplyr::select(data1, A1.N, B1.N, C1.N, D1.N, E1.N, F1.N),
+              dplyr::select(data2, A2.N, B2.N, C2.N, D2.N, E2.N, F2.N))
+sumN <- colSums(allN)
+sumN <- sum(sumN)
+total_trials <- 15*6*2*n_full_subj
+dropped_trials_pc <- (total_trials - sumN) / total_trials * 100
+
+#next loop added as R seems to think everything is a character
+for (v in 1:ncol(alltask)){
+  alltask[,v]<-as.numeric(alltask[,v])
+}
+
+mylabels<-c("ListGen1","PhonDec1","SemDec1","SentGen1","SentComp1","Jabber1",
+            "ListGen2","PhonDec2","SemDec2","SentGen2","SentComp2","Jabber2")
+myshortlab<-c("ListGen","PhonDec","SemDec","SentGen","SentComp","Jabber")
+mylonglab <-c("List Generation","Phonological Decision","Semantic Decision",
+              "Sentence Generation","Sentence Comprehension","Syntactic Decision")
+
+colnames(alltask)<-mylabels
+
+# Create a new copy where the outliers will be retained
+alltaskall <- alltask
+
+# Identify datapoints with less than 10 useable trials to be excluded
+dropN<-0 #initialise counter
+
+nbit<-c("A1.N","B1.N","C1.N","D1.N","E1.N","F1.N")
+for (i in 1:6){
+  w<-which(colnames(data1) == nbit[i])
+  ww<-which(as.numeric(data1[ ,w]) < 10)
+  if(length(ww) > 0){
+    alltask[ww,i] <- NA
+    dropN <- dropN + length(ww)
+  }
+}
+
+nbit<-c("A2.N","B2.N","C2.N","D2.N","E2.N","F2.N")
+for (i in 1:6){
+  w <- which(colnames(data2) == nbit[i])
+  ww <- which(as.numeric(data2[ ,w]) < 10)
+  if(length(ww) > 0){
+    alltask[ww,(i+6)] <- NA
+    dropN <- dropN + length(ww)
+    dropN
+  }
+}
+cat(paste("Dropped datapoints because < 10 trials, N = ",dropN))
+
+subj_inclusion <- data.frame(
+  "ID" = data1$Filename,
+  "include" = rep(1, length(data1$Filename))
+)
+
+for (i in 1:length(data1$Filename)){
+  count_NAs <- length(which(is.na(alltask[i, ])))
+  if (count_NAs > 1) { subj_inclusion$include[i] <- 0}
+}
+
+drop_subj <- subj_inclusion$ID[which(subj_inclusion$include == 0)]
+
+cat(paste("\nDropped subjects because > 2 missing or dropped datapoints, N = ", length(drop_subj)))
+cat(paste("\nDropped subject(s): ", drop_subj))
+
+# Remove these subjects from particdat, data1, data2, alltask and alltaskall
+particdat <- particdat[-which(particdat$ID %in% drop_subj), ] 
+alltask <- alltask[-which(data1$Filename %in% drop_subj), ]
+alltaskall <- alltaskall[-which(data1$Filename %in% drop_subj), ]
+data1 <- data1[-which(data1$Filename %in% drop_subj), ]
+data2 <- data2[-which(data2$Filename %in% drop_subj), ]
+
+allse <- cbind(dplyr::select(data1,A1.mean_se,B1.mean_se,C1.mean_se,D1.mean_se,E1.mean_se,F1.mean_se),
+               dplyr::select(data2,A2.mean_se,B2.mean_se,C2.mean_se,D2.mean_se,E2.mean_se,F2.mean_se))
+
+#next loop added as R seems to think everything is a character
+for (v in 1:ncol(allse)){
+  allse[,v]<-as.numeric(allse[,v])
+}
+
+myse<-c(allse[,1], allse[,2], allse[,3], allse[,4], allse[,5],allse[,6],
+        allse[,7], allse[,8], allse[,9], allse[,10], allse[,11], allse[,12])
+        
+Q3<-quantile(myse,.75,na.rm=TRUE)
+Q1<-quantile(myse,.25,na.rm=TRUE)
+Qlimit<-Q3+2.2*(Q3-Q1)
+
+dropSE<-0 #initialise counter
+
+for (i in 1:12){
+  w <- which(allse[,i]>Qlimit)
+  if (length(w)>0){
+    alltask[w,i]<-NA
+    dropSE <- dropSE + length(w)
+  }
+}
+
+cat(paste("Dropped datapoints because high SE, N = ",dropSE))
+
+# Drop participants if two or more datapoints are dropped as outliers
+subj_inclusion_outliers <- data.frame(
+  "ID" = data1$Filename,
+  "include" = rep(1, length(data1$Filename))
+)
+
+for (i in 1:length(data1$Filename)){
+  count_NAs <- length(which(is.na(alltask[i, ])))
+  if (count_NAs > 1) { subj_inclusion_outliers$include[i] <- 0}
+}
+
+drop_subj_outliers <- subj_inclusion_outliers$ID[which(subj_inclusion_outliers$include == 0)]
+
+cat(paste("\nDropped subjects because > 2 outlier datapoints, N = ", length(drop_subj_outliers)))
+cat(paste("\n", drop_subj_outliers))
+
+if (length(drop_subj_outliers) > 0){
+  # Remove these subjects from particdat, data1, data2, alltask and alltaskall
+  particdat <- particdat[-which(particdat$ID %in% drop_subj_outliers), ] 
+  alltask <- alltask[-which(data1$Filename %in% drop_subj_outliers), ]
+  alltaskall <- alltaskall[-which(data1$Filename %in% drop_subj_outliers), ]
+  data1 <- data1[-which(data1$Filename %in% drop_subj_outliers), ]
+  data2 <- data2[-which(data2$Filename %in% drop_subj_outliers), ]
+}
+
+# Count final number of subjects
+nsubj_final <- dim(data1)[1]
+cat(paste("\nFinal number of subjects: ", nsubj_final))
+```
+
+```{r jabber.LI, echo- FALSE, include= FALSE}
+jabber.dat <- cbind(dplyr::select(alltask, "Jabber1", "Jabber2"), particdat)
+  levels(jabber.dat$handedness) <- c("Left", "Right")
+jabber.dat.long <- tidyr::gather(jabber.dat, task, LI, Jabber1:Jabber2, factor_key=TRUE)
+  levels(jabber.dat.long$task) <- c("Session 1", "Session 2")
+# plot jabberwocky  
+jabber.plot <- ggplot(jabber.dat.long, aes(y=LI, x= handedness, fill=handedness)) +
+  geom_hline(yintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_violin(alpha= .5, width= .75) +
+  geom_boxplot(alpha= .5, width= .25) +
+  ylab("Laterality index") + xlab("") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(20) + theme(legend.position="top") + facet_wrap(~task)
+ggsave("plots/jabber.png", plot= jabber.plot, dpi= 600, width= 6, height= 6)
+# t.tests
+right.zero <- t.test(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 1",]$LI)
+left.zero <- t.test(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 1",]$LI)
+t.jabber <- t.test(jabber.dat.long[jabber.dat.long$task== "Session 1",]$LI ~ jabber.dat.long[jabber.dat.long$task== "Session 1",]$handedness)
+right.zero.2 <- t.test(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 2",]$LI)
+left.zero.2 <- t.test(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 2",]$LI)
+t.jabber.2 <- t.test(jabber.dat.long[jabber.dat.long$task== "Session 2",]$LI ~ jabber.dat.long[jabber.dat.long$task== "Session 2",]$handedness)
+```
+
+![Figure 1. Laterality indices on the Jabberwocky task for right and left handers across the two testing sessions. The dashed horizontal line at zero indicates no lateralisation.](./plots/jabber.png){width=300px}
+
+First, from Session 1 data, right handers (*M*= `r round(mean(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 1",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 1",]$LI, na.rm= TRUE), 2)`) were not significantly lateralised on the task, *t*(`r round(as.numeric(right.zero[2]), 2)`)= `r round(as.numeric(right.zero[1]), 2)`, *95% CI*= [`r round(right.zero$conf.int[1], 2)`, `r round(right.zero$conf.int[2], 2)`], *p*= `r round(p.adjust(right.zero$p.value, n=2, method= "bonferroni"),3)`. Likewise, left handers (*M*= `r round(mean(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 1",]$LI, na.rm= TRUE), 2)`), *SD*= `r round(sd(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 1",]$LI, na.rm= TRUE), 2)` were not significantly lateralized on the task, *t*(`r round(as.numeric(left.zero[2], 2))`)= `r round(as.numeric(left.zero[1]), 2)`, *95% CI*= [`r round(left.zero$conf.int[1], 2)`, `r round(left.zero$conf.int[2], 2)`], *p*= `r round(p.adjust(left.zero$p.value, n=2, method= "bonferroni"),3)`. It was found that right-handed participants' LI, on average, did not differ from left handed participants, *t*(`r round(as.numeric(t.jabber[2]),2)`)= `r round(as.numeric(t.jabber[1]), 2)`, *95% CI*= [`r round(t.jabber$conf.int[1],2)`, `r round(t.jabber$conf.int[2], 2)`], *p*= `r round(p.adjust(t.jabber$p.value, n=2, method= "bonferroni"),3)`. An idenitical pattern emerged from Session 2 data. Right handers (*M*= `r round(mean(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 2",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(jabber.dat.long[jabber.dat.long$handedness== "Right" & jabber.dat.long$task== "Session 2",]$LI, na.rm= TRUE), 2)`) were not significantly lateralised on the task, *t*(`r round(as.numeric(right.zero.2[2]), 2)`)= `r round(as.numeric(right.zero.2[1]), 2)`, *95% CI*= [`r round(right.zero.2$conf.int[1], 2)`, `r round(right.zero.2$conf.int[2], 2)`], *p*= `r round(p.adjust(right.zero.2$p.value, n=2, method= "bonferroni"),3)`. Again, left handers (*M*= `r round(mean(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 2",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(jabber.dat.long[jabber.dat.long$handedness== "Left" & jabber.dat.long$task== "Session 2",]$LI, na.rm= TRUE), 2)`) were not significantly lateralized on the task, *t*(`r round(as.numeric(left.zero.2[2], 2))`)= `r round(as.numeric(left.zero.2[1]), 2)`, *95% CI*= [`r round(left.zero.2$conf.int[1], 2)`, `r round(left.zero.2$conf.int[2], 2)`], *p*= `r round(p.adjust(left.zero.2$p.value, n=2, method= "bonferroni"),3)`. LIs for right-handed participants' did not differ from LIs for left handed participants, *t*(`r round(as.numeric(t.jabber.2[2]),2)`)= `r round(as.numeric(t.jabber.2[1]), 2)`, *95% CI*= [`r round(t.jabber.2$conf.int[1],2)`, `r round(t.jabber.2$conf.int[2], 2)`], *p*= `r round(p.adjust(t.jabber.2$p.value, n=2, method= "bonferroni"),3)`.
+
+```{r jabb.prop, echo- FALSE, include= FALSE}
+# create categorical
+jabber.dat.long <- jabber.dat.long %>%
+  mutate(category= ifelse(LI== 0, "bilat", ifelse(LI > 0, "LeLat", "RiLat")))
+# subset
+jabber.dat.long.1 <- jabber.dat.long[jabber.dat.long$task== "Session 1",]
+# table
+dist.jabber.1 <- table(jabber.dat.long.1$category, jabber.dat.long.1$handedness)
+# subset
+jabber.dat.long.2 <- jabber.dat.long[jabber.dat.long$task== "Session 2",]
+# table
+dist.jabber.2 <- table(jabber.dat.long.2$category, jabber.dat.long.2$handedness)
+# z test
+p.test.jabber.1 <- prop.test(dist.jabber.1)
+p.test.jabber.2 <- prop.test(dist.jabber.2)
+```
+
+From Session 1 data, no left or right handers had Lis of zero. Out of participants with a directional bias, `r round(dist.jabber.1[1,2]/(dist.jabber.1[1,2]+dist.jabber.1[2,2])*100, 2)`% of right handers and `r round(dist.jabber.1[1,1]/(dist.jabber.1[1,1]+dist.jabber.1[2,1])*100, 2)`% of left handers had leftward biases. The proportion of participants with a leftward bias did not differ significantly for right and left handers, *z*= `r round(p.test.jabber.1$statistic,2)`, *95% CI*= [`r round(p.test.jabber.1$conf.int[1], 2)`, `r round(p.test.jabber.1$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.jabber.1$p.value, n= 2, method= "bonferroni"), 3)`. From Session 2 data, no left or right handers had Lis of zero. Out of participants with a directional bias, `r round(dist.jabber.2[1,2]/(dist.jabber.2[1,2]+dist.jabber.1[2,2])*100, 2)`% of right handers and `r round(dist.jabber.2[1,1]/(dist.jabber.2[1,1]+dist.jabber.1[2,1])*100, 2)`% of left handers had leftward biases. The proportion of participants with a leftward bias did not differ significantly for right and left handers, *z*= `r round(p.test.jabber.2$statistic,2)`, *95% CI*= [`r round(p.test.jabber.2$conf.int[1], 2)`, `r round(p.test.jabber.2$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.jabber.2$p.value, n= 2, method= "bonferroni"), 3)`.
+
+### List generation
+
+[Woodhead, Rutherford, and Bishop (2020)](https://doi.org/10.12688/wellcomeopenres.14720.3) conducted a study involving 31 participants (2 left handers). In this study participants completed list generation, sentence generation, and word generation under fTCD. Word generation and sentence generation yielded robust left-lateralised LIs while LIs for list generation were more bilateral (*p*= .073). In the list generation task participants recited an overlearned word sequence, i.e., numbers one to ten.
+
+To examine the depth and breadth of laterality in this dataset we compared LIs at the participant level using an independent samples *t*-test and then examined the proportion using a *z*-test. We note that there were few left handers in this data set so the analysis should be appraoched with caution. 
+
+```{r ruther.prep, echo- FALSE, include= FALSE}
+# get the data for sample info
+osf_retrieve_file("https://osf.io/p59be/") %>% osf_download(conflicts = "skip")
+  list.gen.dat    <- read.csv("WSLG_AnalysisData.csv")
+osf_retrieve_file("https://osf.io/s8c3x/") %>% osf_download(conflicts = "skip")
+  list.gen.P    <- read.csv("WSLG_Participant_Info.csv")
+# check the mean and sd confirms that the data is correct when checked against the wellcome open research article
+mean(list.gen.dat$LI_List)
+sd(list.gen.dat$LI_List)
+```
+
+```{r ruther.LI, echo- FALSE, include= FALSE}
+list.short <- cbind(dplyr::select(list.gen.P, ID, Handedness), dplyr::select(list.gen.dat, LI_List))
+  levels(list.short$Handedness) <- c("Left", "Right")
+# plot list generation
+list.plot <- ggplot(list.short, aes(y=LI_List, x= Handedness, fill=Handedness)) +
+  geom_hline(yintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_violin(alpha= .5, width= .75) +
+  geom_boxplot(alpha= .5, width= .25) +
+  ylab("Laterality index") + xlab("") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(10) + theme(legend.position="top")
+ggsave("plots/list.png", plot= list.plot, dpi= 600, width= 3, height= 3)
+# t.tests
+right.zero.ruther <- t.test(list.short[list.short$Handedness== "Right",]$LI)
+left.zero.ruther <- t.test(list.short[list.short$Handedness== "Left",]$LI)
+t.ruther <- t.test(list.short$LI ~ list.short$Handedness)
+```
+
+![Figure 2. Laterality indices on the list generation task for right and left handers. The dashed horizontal line at zero indicates no lateralisation.](./plots/list.png){width=300px}
+
+For list generation data, right handers (*M*= `r round(mean(list.short[list.short$Handedness== "Right",]$LI, na.rm= TRUE),2)`, *SD*= `r round(sd(list.short[list.short$Handedness== "Right",]$LI, na.rm= TRUE),2)`) were not singificantly lateralised at the group level, *t*(`r right.zero.ruther$parameter`)= `r round(right.zero.ruther$statistic, 2)`, *95% CI*= [`r round(right.zero.ruther$conf.int[1], 2)`, `r round(right.zero.ruther$conf.int[2], 2)`], *p*= `r round(right.zero.ruther$p.value, 3)`. Left handers (*M*= `r round(mean(list.short[list.short$Handedness== "Left",]$LI, na.rm= TRUE),2)`, *SD*= `r round(sd(list.short[list.short$Handedness== "Left",]$LI, na.rm= TRUE),2)`) were not singificnatly lateralised either, *t*(`r left.zero.ruther$parameter`)= `r round(left.zero.ruther$statistic, 2)`, *95% CI*= [`r round(left.zero.ruther$conf.int[1], 2)`, `r round(left.zero.ruther$conf.int[2], 2)`], *p*= `r round(left.zero.ruther$p.value, 3)`. This is not surprising given the small number of left handers in Woodhead, Rutherford, et al. (2020). An independent samples *t*-test indicated that LIs did not differ between right and left handers, *t*(`r round(t.ruther$parameter,2)`)= `r round(t.ruther$statistic, 2)`, *95% CI*= [`r round(t.ruther$conf.int[1],2)`, `r round(t.ruther$conf.int[2], 2)`], *p*= `r round(t.ruther$p.value, 3)`.
+
+```{r ruther.cat, echo- FALSE, include= FALSE}
+# create categorical
+list.short <- list.short %>%
+  mutate(category= ifelse(LI_List== 0, "bilat", ifelse(LI_List > 0, "LeLat", "RiLat")))
+# table
+ruther.tab <- table(list.short$Handedness, list.short$category)
+p.test.ruther <- prop.test(ruther.tab)
+```
+
+No right or left handers had Lis of zero. `r round(p.test.ruther$estimate[2]*100,2)`% of right handers and `r round(p.test.ruther$estimate[1]*100,2)`% had a leftwards bias. A *z*-test indicated that the proprtion of participants with right and left biases did not differ between participants, *z*= `r round(p.test.ruther$statistic,2)`, *95% CI*= [`r round(p.test.ruther$conf.int[1], 2)`, `r round(p.test.ruther$conf.int[2], 2)`], *p*= `r round(p.test.ruther$p.value, 3)`. This is not suprising given the lack of left handers. 
+
+### Dichotic listening
+
+[Parker, Woodhead, Thompson, and Bishop (2020)](https://psyarxiv.com/sb824/) conducted a consonant-vowel dichotic listening task, which was administered online. Participants heard different syllables in each ear and reported the one which sounded the clearest.
+
+As with the jabberwocky data, we compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples t-tests and apply a bonferroni adjustment to these NHST to correct for mulitple comparions.
+
+```{r dich.prep, echo- FALSE, include= FALSE}
+# get the data for sample info
+osf_retrieve_file("https://osf.io/efuwn/") %>% osf_download(conflicts = "skip")
+  dich.dat    <- read.csv("allsum.csv", na.strings = c("", "NA"))
+# filter out bad Ps
+dich.dat <- dich.dat[dich.dat$lexOut== "keep" & dich.dat$sound.recog1 >= .75 & dich.dat$sound.recog2 >= .75,]
+# remove na
+dich.dat <- dich.dat[!is.na(dich.dat$handedness),]
+# select vairables
+dich.short <- dplyr::select(dich.dat, subject, handedness, Day1_DL_acc_LI, Day2_DL_acc_LI)
+# change to long
+dich.long <- tidyr::gather(dich.short, session, LI, Day1_DL_acc_LI:Day2_DL_acc_LI, factor_key=TRUE)
+  levels(dich.long$session) <- c("Session 1", "Session 2")
+# plot dichotic
+dich.plot <- ggplot(dich.long, aes(y= LI, x= handedness, fill=handedness)) +
+  geom_hline(yintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_violin(alpha= .5, width= .75) +
+  geom_boxplot(alpha= .5, width= .25) +
+  ylab("Laterality index") + xlab("") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(20) + theme(legend.position="top") + facet_wrap(~session)
+ggsave("plots/dichotic.png", plot= dich.plot, dpi= 600, width= 6, height= 6)
+# t.tests
+right.zero.dich <- t.test(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 1",]$LI)
+left.zero.dich <- t.test(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 1",]$LI)
+t.dich <- t.test(dich.long[dich.long$session== "Session 1",]$LI ~ dich.long[dich.long$session== "Session 1",]$handedness)
+right.zero.dich.2 <- t.test(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 2",]$LI)
+left.zero.dich.2 <- t.test(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 2",]$LI)
+t.dich.2 <- t.test(dich.long[dich.long$session== "Session 2",]$LI ~ dich.long[dich.long$session== "Session 2",]$handedness)
+```
+
+![Figure 3. Laterality indices on the dichotic listening task for right and left handers across the two session. The dashed horizontal line at zero indicates no lateralisation.](./plots/dichotic.png){width=300px}
+
+First, from Session 1 data, right handers (*M*= `r round(mean(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 1",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 1",]$LI, na.rm= TRUE), 2)`) were significantly left lateralised on the task, *t*(`r round(as.numeric(right.zero.dich[2]), 2)`)= `r round(as.numeric(right.zero.dich[1]), 2)`, *95% CI*= [`r round(right.zero.dich$conf.int[1], 2)`, `r round(right.zero.dich$conf.int[2], 2)`], *p*< 0.001. Left handers (*M*= `r round(mean(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 1",]$LI, na.rm= TRUE), 2)`), *SD*= `r round(sd(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 1",]$LI, na.rm= TRUE), 2)` were also left lateralized, *t*(`r round(as.numeric(left.zero.dich[2], 2))`)= `r round(as.numeric(left.zero.dich[1]), 2)`, *95% CI*= [`r round(left.zero.dich$conf.int[1], 2)`, `r round(left.zero.dich$conf.int[2], 2)`], *p*= `r round(p.adjust(left.zero.dich$p.value, n=2, method= "bonferroni"),3)`. Right handers were more left lateralised than right handers, *t*(`r round(as.numeric(t.dich[2]),2)`)= `r round(as.numeric(t.dich[1]), 2)`, *95% CI*= [`r round(t.dich$conf.int[1],2)`, `r round(t.dich$conf.int[2], 2)`], *p*= `r round(p.adjust(t.dich$p.value, n=2, method= "bonferroni"),3)`. Session 2 data revealed an identical pattern of results; right handers (*M*= `r round(mean(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 2",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(dich.long[dich.long$handedness== "Right" & dich.long$session== "Session 2",]$LI, na.rm= TRUE), 2)`) were left lateralised, *t*(`r round(as.numeric(right.zero.dich.2[2]), 2)`)= `r round(as.numeric(right.zero.dich.2[1]), 2)`, *95% CI*= [`r round(right.zero.dich.2$conf.int[1], 2)`, `r round(right.zero.dich.2$conf.int[2], 2)`], *p*< 0.001, as were left handers (*M*= `r round(mean(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 2",]$LI, na.rm= TRUE), 2)`, *SD*= `r round(sd(dich.long[dich.long$handedness== "Left" & dich.long$session== "Session 2",]$LI, na.rm= TRUE), 2)`), *t*(`r round(as.numeric(left.zero.dich.2[2], 2))`)= `r round(as.numeric(left.zero.dich.2[1]), 2)`, *95% CI*= [`r round(left.zero.dich.2$conf.int[1], 2)`, `r round(left.zero.dich.2$conf.int[2], 2)`], *p*< 0.001. Again, right handers were more left lateralised than right handers, *t*(`r round(as.numeric(t.dich.2[2]),2)`)= `r round(as.numeric(t.dich.2[1]), 2)`, *95% CI*= [`r round(t.dich.2$conf.int[1],2)`, `r round(t.dich.2$conf.int[2], 2)`], *p*= `r round(p.adjust(t.dich.2$p.value, n=2, method= "bonferroni"),3)`.
+
+
+```{r dich.prop, echo- FALSE, include= FALSE}
+# create categorical
+dich.long <- dich.long %>%
+  mutate(category= ifelse(LI== "NA", "bilat", ifelse(LI > 0, "LeLat", "RiLat")),
+         cat= ifelse(LI== 0, "bilat", ifelse(LI > 0, "LeLat", "RiLat")))
+# subset
+dich.long.1 <- dich.long[dich.long$session== "Session 1",]
+# table
+dist.dich.1 <- table(dich.long.1$category, dich.long.1$handedness)
+# subset
+dich.long.2 <- dich.long[dich.long$session== "Session 2",]
+# table
+dist.dich.2 <- table(dich.long.2$category, dich.long.2$handedness)
+# z test
+p.test.dich.1 <- prop.test(dist.dich.1)
+p.test.dich.2 <- prop.test(dist.dich.2)
+```
+
+From Session 1 data, one right hander and one left hander had LIs of zero. Out of participants with a directional bias, `r round(dist.dich.1[1,2]/(dist.dich.1[1,2]+dist.dich.1[2,2])*100, 2)`% of right handers and `r round(dist.dich.1[1,1]/(dist.dich.1[1,1]+dist.dich.1[2,1])*100, 2)`% of left handers had leftward biases. A greater proportion of right handers were left lateralised, *z*= `r round(p.test.dich.1$statistic,2)`, *95% CI*= [`r round(p.test.dich.1$conf.int[1], 2)`, `r round(p.test.dich.1$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.dich.1$p.value, n= 2, method= "bonferroni"), 3)`. From Session 2 data, two right handers and two left handers had LIs of zero. Out of participants with a directional bias, `r round(dist.dich.2[1,2]/(dist.dich.2[1,2]+dist.dich.1[2,2])*100, 2)`% of right handers and `r round(dist.dich.2[1,1]/(dist.dich.2[1,1]+dist.dich.1[2,1])*100, 2)`% of left handers had leftward biases. Again, a greater proportion of right handers were left lateralised, *z*= `r round(p.test.dich.2$statistic,2)`, *95% CI*= [`r round(p.test.dich.2$conf.int[1], 2)`, `r round(p.test.dich.2$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.dich.2$p.value, n= 2, method= "bonferroni"), 3)`.
+
+### Animation description task
+
+[Groen, Whitehouse, Badcock, and Bishop (2012)](https://onlinelibrary.wiley.com/doi/full/10.1002/brb3.56) and [Wilson and Bishop (2018)](https://peerj.com/articles/4217/) administered an animation desription task to children under fTCD. During this task, children silently views a 12 s clip from a cartoon including sounds but no speech. Children then describe what happened in the cartoon. This task required productive language.
+
+First we look at the depth and breadth of lateralisation in the data provided by Groen et al. (2012) and then Wilson and Bishop (2018). Again, we correct fr multiple comparisons.
+
+```{r WandB, echo- FALSE, include= FALSE}
+# read data
+WB18 <- read.csv("TwinsData_OSF.csv", na.strings = "NA")
+# now let's get a subset fortypically developing childrn
+WB18 <- subset(WB18, lang_probs == 0 & include ==1)
+# handedness
+WB18$Handedness <- WB18$Handesness
+# remove na
+WB18 <- WB18[!is.na(WB18$Handedness), ]
+# plot animation
+WB18.plot <- ggplot(WB18, aes(y=laterality_index, x= Handedness, fill=Handedness)) +
+  geom_hline(yintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_violin(alpha= .5, width= .75) +
+  geom_boxplot(alpha= .5, width= .25) +
+  ylab("Laterality index") + xlab("") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(10) + theme(legend.position="top")
+ggsave("plots/animation_WB.png", plot= WB18.plot, dpi= 600, width= 3, height= 3)
+# t.tests
+right.zero.WB <- t.test(WB18[WB18$Handedness== "Right",]$laterality_index)
+left.zero.WB <- t.test(WB18[WB18$Handedness== "Left",]$laterality_index)
+t.WB <- t.test(WB18$laterality_index ~ WB18$Handedness)
+```
+
+![Figure 4. Laterality indices on the animation description task for right and left handers reported in Wilson and Bishop (2018). The dashed horizontal line at zero indicates no lateralisation.](./plots/animation_WB.png){width=300px}
+
+For the animation description data presented by Wilson and Bishop (2018), LIs for right handers (*M*= `r round(mean(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`) were singificantly lateralised at the group level, *t*(`r right.zero.WB$parameter`)= `r round(right.zero.WB$statistic, 2)`, *95% CI*= [`r round(right.zero.WB$conf.int[1], 2)`, `r round(right.zero.WB$conf.int[2], 2)`], *p*< 0.001. LIs for left handers (*M*= `r round(mean(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`) were also singificnatly lateralised at the group level, *t*(`r left.zero.WB$parameter`)= `r round(left.zero.WB$statistic, 2)`, *95% CI*= [`r round(left.zero.WB$conf.int[1], 2)`, `r round(left.zero.WB$conf.int[2], 2)`], *p*= `r round(left.zero.WB$p.value, 3)`. An independent samples *t*-test indicated that LIs did not differ between right and left handers, *t*(`r round(t.WB$parameter,2)`)= `r round(t.WB$statistic, 2)`, *95% CI*= [`r round(t.WB$conf.int[1],2)`, `r round(t.WB$conf.int[2], 2)`], *p*= `r round(t.WB$p.value, 3)`.
+
+```{r WB.cat, echo- FALSE, include= FALSE}
+# create categorical
+WB18 <- WB18 %>%
+  mutate(category= ifelse(laterality_index== 0, "bilat", ifelse(laterality_index > 0, "LeLat", "RiLat")))
+# table
+WB.tab <- table(WB18$Handedness, WB18$category)
+p.test.WB <- prop.test(WB.tab)
+```
+
+No right or left handers had Lis of zero. `r round(p.test.WB$estimate[2]*100,2)`% of right handers and `r round(p.test.WB$estimate[1]*100,2)`% had a leftwards bias. A *z*-test indicated that the proprtion of participants with right and left biases did not differ between participants, *z*= `r round(p.test.WB$statistic,2)`, *95% CI*= [`r round(p.test.WB$conf.int[1], 2)`, `r round(p.test.WB$conf.int[2], 2)`], *p*= `r round(p.test.WB$p.value, 3)`.
+
+#### References
+
+Bishop, D. V., Badcock, N. A., & Holt, G. (2010). Assessment of cerebral lateralization in children using functional transcranial Doppler ultrasound (fTCD). *JoVE (Journal of Visualized Experiments)*, *43*, e2161. https://doi.org/10.3791/2161
+
+Groen, M. A., Whitehouse, A. J., Badcock, N. A., & Bishop, D. V. (2012). Does cerebral lateralization develop? A study using functional transcranial Doppler ultrasound assessing lateralization for language production and visuospatial memory. *Brain and behavior*, *2*, 256-269. https://doi.org/10.1002/brb3.56
+
+Karlsson, E. M., Johnstone, L. T., & Carey, D. P. (2019). The depth and breadth of multiple perceptual asymmetries in right handers and non-right handers. *Laterality: Asymmetries of Body, Brain and Cognition*, *24*, 707-739. https://doi.org/10.1080/1357650X.2019.1652308
+
+Parker, A. J., Woodhead, Z. V. J., Thompson, P. A., & Bishop, D. V. M. (2020). Assessing the reliability of an online behavioural laterality battery: a pre-registered study. https://doi.org/10.31234/osf.io/sb824
+
+Woodhead ZVJ, Rutherford HA and Bishop DVM. Measurement of language laterality using functional transcranial Doppler ultrasound: a comparison of different tasks. *Wellcome Open Research*, *3*, 104. https://doi.org/10.12688/wellcomeopenres.14720.3
+
+Woodhead, Z. V. J., Thompson, P. A., Karlsson, E., & Bishop, D. V. M. (2020). Investigating multidimensionality of language lateralisation in left and right handed adults: an update on Woodhead et al. 2019. https://doi.org/10.31234/osf.io/mrkgf
+
+Wilson, A. C., & Bishop, D. V. (2018). Resounding failure to replicate links between developmental language disorder and cerebral lateralisation. *PeerJ*, 6, e4217. https://doi.org/10.7717/peerj.4217
