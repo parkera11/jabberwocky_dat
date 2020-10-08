@@ -24,7 +24,7 @@ library(osfr)
 
 First, we explore the depth and the breadth of assymetry for the Jabberwocky data reported by [Woodhead, Thompson, Karlsson, and Bishop (2020)](https://psyarxiv.com/mrkgf/). Woodhead et al. had 74 participants (43 right handers) complete the Jabberwocky task twice on two occasions under fTCD. The task itself requires participants to make a syntactic decision and judge whether a sequence of words and non-words formed a plausible ‘jabberwocky’ sentence with correct syntactic structure. 
 
-We compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples *t*-tests. We then compare the proportions of left vs. right lateralisation in left and right handers in both data sets using a series of *z*-tests. We apply a bonferroni adjustment to these NHST to correct for mulitple comparions.
+We compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples *t*-tests. We then compare the proportions of left vs. right lateralisation in left and right handers in both data sets using a series of *z*-tests. We apply a bonferroni adjustment to these NHST to correct for mulitple comparions. Our analyses included 43 right handers and 31 left handers.
 
 ```{r prep.jabber, echo- FALSE, include= FALSE}
 # This recycles the code used in Woodhead et al. RSOS update
@@ -246,7 +246,7 @@ From Session 1 data, no left or right handers had Lis of zero. Out of participan
 
 [Woodhead, Rutherford, and Bishop (2020)](https://doi.org/10.12688/wellcomeopenres.14720.3) conducted a study involving 31 participants (2 left handers). In this study participants completed list generation, sentence generation, and word generation under fTCD. Word generation and sentence generation yielded robust left-lateralised LIs while LIs for list generation were more bilateral (*p*= .073). In the list generation task participants recited an overlearned word sequence, i.e., numbers one to ten.
 
-To examine the depth and breadth of laterality in this dataset we compared LIs at the participant level using an independent samples *t*-test and then examined the proportion using a *z*-test. We note that there were few left handers in this data set so the analysis should be appraoched with caution. 
+To examine the depth and breadth of laterality in this dataset we compared LIs at the participant level using an independent samples *t*-test and then examined the proportion using a *z*-test. While there were 29 right handers in the current data, there were only two left handers so the analysis should be appraoched with caution. 
 
 ```{r ruther.prep, echo- FALSE, include= FALSE}
 # get the data for sample info
@@ -295,7 +295,7 @@ No right or left handers had Lis of zero. `r round(p.test.ruther$estimate[2]*100
 
 [Parker, Woodhead, Thompson, and Bishop (2020)](https://psyarxiv.com/sb824/) conducted a consonant-vowel dichotic listening task, which was administered online. Participants heard different syllables in each ear and reported the one which sounded the clearest.
 
-As with the jabberwocky data, we compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples t-tests and apply a bonferroni adjustment to these NHST to correct for mulitple comparions.
+As with the jabberwocky data, we compare LIs at the population level between right and left handers in both data sets (Session 1 data and Session 2 data) using a series of independent samples t-tests and apply a bonferroni adjustment to these NHST to correct for mulitple comparions. Our analysis included 221 right handers and 76 left handers.
 
 ```{r dich.prep, echo- FALSE, include= FALSE}
 # get the data for sample info
@@ -358,6 +358,53 @@ From Session 1 data, one right hander and one left hander had LIs of zero. Out o
 
 First we look at the depth and breadth of lateralisation in the data provided by Groen et al. (2012) and then Wilson and Bishop (2018). Again, we correct fr multiple comparisons.
 
+#### Groen, Whitehouse, Badcock, and Bishop (2012)
+
+Our analysis of Groen et al. (2012) includes data for 53 right handers and 4 left handers. Due to the small number of left handers our results should be appraoched with caution.
+
+```{r Goren_prep, echo- FALSE, include= FALSE}
+# read data
+groen.dat <- read.csv("margriet_data.csv", na.strings = c("NA", "999"))
+# now let's get a subset fortypically developing childrn
+groen.dat <- subset(groen.dat, include==1 & ff_ok== 1)
+# handedness
+groen.dat$Handedness <- ifelse(groen.dat$Hand_Quest_LQ< 0, "Left",
+                               ifelse(groen.dat$Hand_Quest_LQ> 0, "Right", NA))
+# remove na
+groen.dat <- groen.dat[!is.na(groen.dat$Handedness), ]
+# plot animation
+groen.dat.plot <- ggplot(groen.dat, aes(y=ff_scr_LI, x= Handedness, fill=Handedness)) +
+  geom_hline(yintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_violin(alpha= .5, width= .75) +
+  geom_boxplot(alpha= .5, width= .25) +
+  ylab("Laterality index") + xlab("") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(10) + theme(legend.position="top")
+ggsave("plots/animation_Groen.png", plot= groen.dat.plot, dpi= 600, width= 3, height= 3)
+# t.tests
+right.zero.Groen <- t.test(groen.dat[groen.dat$Handedness== "Right",]$ff_scr_LI)
+left.zero.Groen <- t.test(groen.dat[groen.dat$Handedness== "Left",]$ff_scr_LI)
+t.Groen <- t.test(groen.dat$ff_scr_LI ~ groen.dat$Handedness)
+```
+
+![Figure 4. Laterality indices on the animation description task for right and left handers reported in Groen et al. (2012). The dashed horizontal line at zero indicates no lateralisation.](./plots/animation_Groen.png){width=300px}
+
+For the animation description data presented bby Groen et al. (2012), LIs for right handers (*M*= `r round(mean(groen.dat[groen.dat$Handedness== "Right",]$ff_scr_LI, na.rm= TRUE),2)`, *SD*= `r round(sd(groen.dat[groen.dat$Handedness== "Right",]$ff_scr_LI, na.rm= TRUE),2)`) were singificantly lateralised at the group level, *t*(`r right.zero.Groen$parameter`)= `r round(right.zero.Groen$statistic, 2)`, *95% CI*= [`r round(right.zero.Groen$conf.int[1], 2)`, `r round(right.zero.Groen$conf.int[2], 2)`], *p*< 0.001. LIs for left handers (*M*= `r round(mean(groen.dat[groen.dat$Handedness== "Left",]$ff_scr_LI, na.rm= TRUE),2)`, *SD*= `r round(sd(groen.dat[groen.dat$Handedness== "Left",]$ff_scr_LI, na.rm= TRUE),2)`) were not lateralised at the group level, *t*(`r left.zero.Groen$parameter`)= `r round(left.zero.Groen$statistic, 2)`, *95% CI*= [`r round(left.zero.Groen$conf.int[1], 2)`, `r round(left.zero.Groen$conf.int[2], 2)`], *p*= `r round(left.zero.Groen$p.value, 3)`. An independent samples *t*-test indicated that LIs did not differ between right and left handers, *t*(`r round(t.Groen$parameter,2)`)= `r round(t.Groen$statistic, 2)`, *95% CI*= [`r round(t.Groen$conf.int[1],2)`, `r round(t.Groen$conf.int[2], 2)`], *p*= `r round(p.adjust(t.Groen$p.value, n=2, method= "bonferroni"),3)`.
+
+```{r Groen.cat, echo- FALSE, include= FALSE}
+# create categorical
+groen.dat <- groen.dat %>%
+  mutate(category= ifelse(ff_scr_LI== 0, "bilat", ifelse(ff_scr_LI > 0, "LeLat", "RiLat")))
+# table
+G.tab <- table(groen.dat$Handedness, groen.dat$category)
+p.test.G <- prop.test(WB.tab)
+```
+
+No right or left handers had Lis of zero. `r round(p.test.G$estimate[2]*100,2)`% of right handers and `r round(p.test.G$estimate[1]*100,2)`% had a leftwards bias. A *z*-test indicated that the proprtion of participants with right and left biases did not differ between participants, *z*= `r round(p.test.G$statistic,2)`, *95% CI*= [`r round(p.test.G$conf.int[1], 2)`, `r round(p.test.G$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.G$p.value, n=2, method= "bonferroni"),3)`.
+
+#### Wilson and Bishop (2018)
+
+Our analysis of Wilson and Bishop (2018) includes data for 139 right handers and 22 left handers.  
+
 ```{r WandB, echo- FALSE, include= FALSE}
 # read data
 WB18 <- read.csv("TwinsData_OSF.csv", na.strings = "NA")
@@ -381,9 +428,9 @@ left.zero.WB <- t.test(WB18[WB18$Handedness== "Left",]$laterality_index)
 t.WB <- t.test(WB18$laterality_index ~ WB18$Handedness)
 ```
 
-![Figure 4. Laterality indices on the animation description task for right and left handers reported in Wilson and Bishop (2018). The dashed horizontal line at zero indicates no lateralisation.](./plots/animation_WB.png){width=300px}
+![Figure 5. Laterality indices on the animation description task for right and left handers reported in Wilson and Bishop (2018). The dashed horizontal line at zero indicates no lateralisation.](./plots/animation_WB.png){width=300px}
 
-For the animation description data presented by Wilson and Bishop (2018), LIs for right handers (*M*= `r round(mean(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`) were singificantly lateralised at the group level, *t*(`r right.zero.WB$parameter`)= `r round(right.zero.WB$statistic, 2)`, *95% CI*= [`r round(right.zero.WB$conf.int[1], 2)`, `r round(right.zero.WB$conf.int[2], 2)`], *p*< 0.001. LIs for left handers (*M*= `r round(mean(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`) were also singificnatly lateralised at the group level, *t*(`r left.zero.WB$parameter`)= `r round(left.zero.WB$statistic, 2)`, *95% CI*= [`r round(left.zero.WB$conf.int[1], 2)`, `r round(left.zero.WB$conf.int[2], 2)`], *p*= `r round(left.zero.WB$p.value, 3)`. An independent samples *t*-test indicated that LIs did not differ between right and left handers, *t*(`r round(t.WB$parameter,2)`)= `r round(t.WB$statistic, 2)`, *95% CI*= [`r round(t.WB$conf.int[1],2)`, `r round(t.WB$conf.int[2], 2)`], *p*= `r round(t.WB$p.value, 3)`.
+For the animation description data presented by Wilson and Bishop (2018), LIs for right handers (*M*= `r round(mean(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Right",]$laterality_index, na.rm= TRUE),2)`) were singificantly lateralised at the group level, *t*(`r right.zero.WB$parameter`)= `r round(right.zero.WB$statistic, 2)`, *95% CI*= [`r round(right.zero.WB$conf.int[1], 2)`, `r round(right.zero.WB$conf.int[2], 2)`], *p*< 0.001. LIs for left handers (*M*= `r round(mean(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`, *SD*= `r round(sd(WB18[WB18$Handedness== "Left",]$laterality_index, na.rm= TRUE),2)`) were also singificnatly lateralised at the group level, *t*(`r left.zero.WB$parameter`)= `r round(left.zero.WB$statistic, 2)`, *95% CI*= [`r round(left.zero.WB$conf.int[1], 2)`, `r round(left.zero.WB$conf.int[2], 2)`], *p*= `r round(left.zero.WB$p.value, 3)`. An independent samples *t*-test indicated that LIs did not differ between right and left handers, *t*(`r round(t.WB$parameter,2)`)= `r round(t.WB$statistic, 2)`, *95% CI*= [`r round(t.WB$conf.int[1],2)`, `r round(t.WB$conf.int[2], 2)`], *p*= `r round(p.adjust(t.WB$p.value, n=2, method= "bonferroni"),3)`
 
 ```{r WB.cat, echo- FALSE, include= FALSE}
 # create categorical
@@ -394,7 +441,7 @@ WB.tab <- table(WB18$Handedness, WB18$category)
 p.test.WB <- prop.test(WB.tab)
 ```
 
-No right or left handers had Lis of zero. `r round(p.test.WB$estimate[2]*100,2)`% of right handers and `r round(p.test.WB$estimate[1]*100,2)`% had a leftwards bias. A *z*-test indicated that the proprtion of participants with right and left biases did not differ between participants, *z*= `r round(p.test.WB$statistic,2)`, *95% CI*= [`r round(p.test.WB$conf.int[1], 2)`, `r round(p.test.WB$conf.int[2], 2)`], *p*= `r round(p.test.WB$p.value, 3)`.
+No right or left handers had Lis of zero. `r round(p.test.WB$estimate[2]*100,2)`% of right handers and `r round(p.test.WB$estimate[1]*100,2)`% had a leftwards bias. A *z*-test indicated that the proprtion of participants with right and left biases did not differ between participants, *z*= `r round(p.test.WB$statistic,2)`, *95% CI*= [`r round(p.test.WB$conf.int[1], 2)`, `r round(p.test.WB$conf.int[2], 2)`], *p*= `r round(p.adjust(p.test.WB$p.value, n=2, method= "bonferroni"),3)`.
 
 #### References
 
