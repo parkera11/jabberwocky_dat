@@ -1,0 +1,320 @@
+---
+title: "Bilateral lateralisation across perceptual and lingustic tasks"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+\
+
+Bilaterality across both perceptual and linguistic tasks and how we define it is often overlooked. Despite this, the definition of bilaterality has repercussions when examining questions regarding laterality. In this notebook, I examine how applying various definitions of bilaterality can influence the conclusions that we form.
+
+### Defining (bi)laterality
+
+The extent of lateralisation is typically quantified using a laterality index. While numerous ways of calculating LIs exist, one of the most widely reported is:
+
+LI= [(L-R)/(L+R)] * 100,
+
+where L and R are scores measured using a variety of tools for the left or right hemisphere, visual field, or ear. Now, consider the following example. In a dichotic listening task participants hear syllables presented simultaneously to each ear. These syllables differ and participants are asked to report the one that sounded clearest. One participants correctly identified 112 stimuli presented to their right ear and 8 presented to their left ear. The LI for this participant is calculated as follows:
+
+LI= [(8-112)/(8+112)] * 100,
+
+LI= [-0.8667] * 100,
+
+LI= -86.67.
+
+Calculating LIs on this scale results in a negative value which can be taken to indicate lateralisation to the left hemisphere. So, this participant would be left lateralised on the dichotic listening. Table 1 shows simulated results for 10 statistical subjects. Those marked in black show left hemisphere dominance (LI < 0), those mark in blue show bilateral language (LI= 0), and those marked in red show right lateralised language.
+
+\
+
+Table 1. Simulated results for the dichotic listening tasks.
+```{r table, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+set.seed(999)
+# create a bunch of scores (let's assume all correct for simplicity)
+range <- data.frame(a=0:120, b=120:0)
+# now sample the row for each participant
+rows <- sample(1:121, 10)
+# create data frame
+sim <- data.frame(matrix(ncol = 5, nrow = 10))
+  colnames(sim) <- c("Participant", "Left ear", "Right ear", "Difference (L-R)", "Laterality index")
+# code P number
+sim$Participant <- 1:10
+# for loop to extra paring
+myrow <- 0 # start row counter
+for (i in 1:10) { 
+  draw <- rows[i]
+  left.score <- range$a[draw]
+  right.score <- range$b[draw]
+  
+  myrow <- i
+
+  sim$`Left ear`[myrow] <- left.score
+  sim$`Right ear`[myrow] <- right.score
+  sim$`Difference (L-R)`[myrow] <- left.score - right.score
+  sim$`Laterality index`[myrow] <- round(((left.score-right.score)/(left.score+right.score)) * 100,2)
+}
+# table
+fit <- flextable::flextable(sim)
+fit <- flextable::autofit(fit, add_w = 0.1, add_h = 0.1, part = c("body", "header"))
+fit <- flextable::color(fit, i= c(2, 4, 5,7), color = "red")
+fit <- flextable::color(fit, i= 3, color = "blue")
+flextable::align(fit, align= "center")
+```
+\
+
+From Table 1, an important issue is then is how to actually define bilaterally. The simplest way to do so is to consider bilateral participants as those with an LI of zero, where they scored an equal number of correct responses to the left and the right for each ear. This of course occurs very infrequently in actual data. Now let's look at the dichotic listening data collected by Parker, Woodhead, Thompson, and Bishop (2020) to see how the distribution of scores looks on the dichotic listening.
+
+[Parker, Woodhead, Thompson, and Bishop (2020)](https://psyarxiv.com/sb824/) administered an online battery of tasks to a sample of more than 400 participants. Participants completed a rhyme decision, dichotic listening, chimeric faces, and finger tapping task twice so that the authors could establish test-retest reliability. The reliability for each task is as follows:
+
+- Rhyme decision: 0.63
+- Dichotic listening: 0.78
+- Chimeric faces: 0.88
+- Finger tapping: 0.75
+
+The scores on the dichotic listening task are widely spread (see Figure 1). An issue that becomes clear from eye balling the data is that the majority of participants have scores fairly close to zero and the issue then is where should the line for bilateral language be drawn. Some authors argue that a threshold for lateralisation should be higher than |LI|> 0. For instance, some use a cut-off as |LI|> 20 (e.g. [Deblaere et al., 2004](https://link.springer.com/article/10.1007/s00234-004-1196-0), [Springer et al., 1999](https://academic.oup.com/brain/article/122/11/2033/377236); see [Bradshaw, Bishop, & Woodhead, 2017, for a review](https://peerj.com/articles/3557/)). Let's consider what these variable thresholds mean for the data reported by Parker et al. (2020).
+
+```{r dich, echo=FALSE,include=FALSE, comment=FALSE, warning=FALSE}
+library("dplyr")
+library("ggplot2")
+library("osfr")
+library("flextable")
+# get the data for sample info
+#osf_retrieve_file("https://osf.io/efuwn/") %>% osf_download(conflicts = "skip")
+  dich.dat    <- read.csv("allsum.csv", na.strings = c("", "NA"))
+# filter out bad Ps
+dich.dat <- dich.dat[dich.dat$lexOut== "keep" & dich.dat$sound.recog1 >= .75 & dich.dat$sound.recog2 >= .75,]
+# plot
+dich.plot <- ggplot(dich.dat, aes(x= Day1_DL_acc_LI)) +
+  geom_density(fill="#69b3a2", color="#e9ecef", alpha=0.8) +
+  geom_rug(color="#69b3a2") +
+  geom_vline(xintercept = 0, linetype="dashed", color= "Red", size= 1.5) +
+  geom_vline(xintercept = 20, linetype="dashed", color= "Red", size= .5) +
+  geom_vline(xintercept = -20, linetype="dashed", color= "Red", size= .5) +
+  xlab("Laterality index") +
+  scale_fill_brewer(palette="Dark2") + theme_bw(20) 
+ggsave("plots/dichotic_dist.png", plot= dich.plot, dpi= 600, width= 6, height= 6)
+
+# Now let's make table for the count of LI groups based on various cut offs.
+# list of thresholds
+threshold <- c(0.000000000000000001, 10, 20, 30)
+# create data frame
+thresh.sim <- data.frame(matrix(ncol = 4, nrow = 4))
+  colnames(thresh.sim) <- c("Threshold", "Left lateralised", "Bilateral", "Right lateralised")
+# loop through threshold values
+myrow <- 0 # start row counter
+for (i in 1:4) { 
+  draw <- threshold[i]
+  dich.dat$cut <- cut(dich.dat$Day1_DL_acc_LI, breaks = c(-Inf, -draw, draw, Inf), labels = c("Right", "Bilat", "Left"), right = FALSE)
+  
+  myrow <- i
+
+  thresh.sim$Threshold[myrow] <- draw
+  thresh.sim$`Left lateralised`[myrow] <- plyr::count(dich.dat$cut=="Left")[2,2]
+  thresh.sim$`Right lateralised`[myrow] <- plyr::count(dich.dat$cut=="Right")[2,2]
+  thresh.sim$`Bilateral`[myrow] <- plyr::count(dich.dat$cut=="Bilat")[2,2]
+}
+thresh.sim$Threshold[1] <- 0
+thresh.sim$Threshold[2] <- 10
+thresh.sim$Threshold[3] <- 20
+thresh.sim$Threshold[4] <- 30
+# table
+fit2 <- flextable::flextable(thresh.sim)
+fit2 <- flextable::autofit(fit2, add_w = 0.1, add_h = 0.1, part = c("body", "header"))
+```
+
+\
+
+![Figure 1. Distribution of laterality indices on the dichotic listening task. The dashed line at zero represents truely bilateral language. The dashed lines at -20 and 20 show a less consverative measurement of bilaterality.](./plots/dichotic_dist.png){width=300px}
+
+\
+
+From Table 2, it can bee seen that adjusting the arbitrary threshold for cerebral dominance has drastic effects on the proportion of participants characterised as left, bilateral, or right lateralised. When defining bilateral lateralisation as an LI of zero, only `r print(thresh.sim$Bilateral[1])` participants are bilateral. However, when the threshold increases to an |LI|> 10, there are already a substantial number (`r print(thresh.sim$Bilateral[2])`) of participants who now appear as bilateral. Next we investigate the effect that this will have for looking at the association between laterality across tasks. 
+
+\
+
+Table 2. Count of lateralisation depending on arbitrary cut-off for lateralisation.
+```{r tab2, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+flextable::align(fit2, align= "center")
+```
+
+\
+
+### Laterality between tasks
+
+As we saw in Table 2, varying the threshold for lateralisation can influence the division of left, bilateral, and right lateralised participants in a sample. This will, of course, have repercussions for the examination of associations between laterality, particularly when using count data. These repercussions using data for the dichotic listening and chimeric faces tasks presented by Parker et al. (2020). The relationship between the LIs are shown visually in Figure 2. It is clear that there is no correlation between LIs on each task. 
+
+```{r compare,include=FALSE, comment=FALSE, warning=FALSE}
+library("hrbrthemes")
+dich.dat <- dich.dat[dich.dat$lexOut== "keep" & dich.dat$sound.recog1 >= .75 & dich.dat$sound.recog2 >= .75 & dich.dat$Emot.corr.same1 >= .75 & dich.dat$Emot.corr.same2 >= .75,]
+# corr
+DL.CF <- ggplot(dich.dat, aes(x=dich.dat$Day1_DL_acc_LI, y=dich.dat$Day1_CF_acc_LI)) + 
+  geom_point(color="black", fill="#69b3a2", shape=22, alpha=0.4,size=4, stroke = .5)+ 
+  geom_smooth(method= lm, color= "black", se= TRUE)+
+  geom_rug(color= "#69b3a2") +
+  theme_bw(20) + ylab("Chimeric face LI") + xlab("Dichotic listening LI")
+ggsave("plots/dichotic_CF_cor.png", plot= DL.CF, dpi= 600, width= 6, height= 6)
+
+
+# create data frame
+thresh.sim <- data.frame(matrix(ncol = 10, nrow = 4))
+  colnames(thresh.sim) <- c(" ", "Left", "Bilateral", "Right", "Left", "Bilateral", "Right", "Left", "Bilateral", "Right")
+# loop through threshold values
+dich.dat$cut.DL <- cut(dich.dat$Day1_DL_acc_LI, breaks = c(-Inf, -0.000000000000000001, 0.000000000000000001, Inf), labels = c("R.DL", "B.DL", "L.DL"), right = FALSE)
+dich.dat$cut.CF <- cut(dich.dat$Day1_CF_acc_LI, breaks = c(-Inf, -0.000000000000000001, 0.000000000000000001, Inf), labels = c("R.CF", "B.CF", "L.CF"), right = FALSE)
+  tab0 <- table(dich.dat$cut.CF, dich.dat$cut.DL)
+dich.dat$cut.DL <- cut(dich.dat$Day1_DL_acc_LI, breaks = c(-Inf, -10, 10, Inf), labels = c("R.DL.1", "B.DL.1", "L.DL.1"), right = FALSE)
+dich.dat$cut.CF <- cut(dich.dat$Day1_CF_acc_LI, breaks = c(-Inf, -10, 10, Inf), labels = c("R.CF", "B.CF", "L.CF"), right = FALSE)
+  tab10 <- table(dich.dat$cut.CF, dich.dat$cut.DL)
+dich.dat$cut.DL <- cut(dich.dat$Day1_DL_acc_LI, breaks = c(-Inf, -20, 20, Inf), labels = c("R.DL.2", "B.DL.2", "L.DL.2"), right = FALSE)
+dich.dat$cut.CF <- cut(dich.dat$Day1_CF_acc_LI, breaks = c(-Inf, -20, 20, Inf), labels = c("R.CF", "B.CF", "L.CF"), right = FALSE)
+  tab20 <- table(dich.dat$cut.CF, dich.dat$cut.DL)
+dich.dat$cut.DL <- cut(dich.dat$Day1_DL_acc_LI, breaks = c(-Inf, -30, 30, Inf), labels = c("R.DL.3", "B.DL.3", "L.DL.3"), right = FALSE)
+dich.dat$cut.CF <- cut(dich.dat$Day1_CF_acc_LI, breaks = c(-Inf, -30, 30, Inf), labels = c("R.CF", "B.CF", "L.CF"), right = FALSE)
+  tab30 <- table(dich.dat$cut.CF, dich.dat$cut.DL)
+tabs <- data.frame(cbind(tab0, tab10, tab20, tab30))
+tabs$`Chimeric faces` <- c("L", "B", "R")
+tabs <- tabs[, c(13,3,2,1,6,5,4,9,8,7,12,11,10)]
+
+tab.tabs <- flextable(tabs)
+tab.tabs <- set_header_labels(tab.tabs, `Chimeric faces`= " ", 
+                            L.DL= "Threshold= 0", B.DL= "Threshold= 0", R.DL= "Threshold= 0",
+                            L.DL.1= "Threshold= 10", B.DL.1= "Threshold= 10", R.DL.1= "Threshold= 10",
+                            L.DL.2= "Threshold= 20", B.DL.2= "Threshold= 20", R.DL.2= "Threshold= 20",
+                            L.DL.3= "Threshold= 30", B.DL.3= "Threshold= 30", R.DL.3= "Threshold= 30")
+tab.tabs <- merge_at(tab.tabs, i = 1, j = 2:4, part = "header")
+tab.tabs <- merge_at(tab.tabs, i = 1, j = 5:7, part = "header")
+tab.tabs <- merge_at(tab.tabs, i = 1, j = 8:10, part = "header")
+tab.tabs <- merge_at(tab.tabs, i = 1, j = 11:13, part = "header")
+tab.tabs <- add_header_row(tab.tabs, values = c("Chimeric faces", 
+                                  "L", "B", "R", "L", "B", "R", "L", "B", "R", "L", "B", "R"), top = FALSE)
+tab.tabs <- theme_booktabs(tab.tabs)
+tab.tabs <- fix_border_issues(tab.tabs)
+
+test.0 <- chisq.test(tab0)
+test.10 <- chisq.test(tab10)
+test.20 <- chisq.test(tab20)
+test.30 <- chisq.test(tab30)
+```
+
+\
+
+![Figure 2. Scatterplot for LIs on the dichotic listening and chimeric faces task. The solid black line shows represents the line of best fit. The green data points represent individual participants' data.](./plots/dichotic_CF_cor.png){width=300px}
+
+\
+
+Table 3 shows the counts of participants who are lateralised to the left or right hemisphere for both the dichotic listening and chimeric faces tasks when applying various arbitrary cut-offs. From the table, it is clear that each cut-off has implications for association between laterality indices on both tasks. When defining lateralised participants with those with an LI of |LI|> 0, the association is not significant, chi-squared = `r round(test.0$statistic,2)`, *df* = 4, `r round(test.0$p.value, 3)`. Furthermore, the association is not significant when applying a threshold of |LI|> 10, chi-squared= `r round(test.10$statistic,2)`, *df* = 4, *p*= `r round(test.10$p.value, 3)`, or |LI|> 30, chi-squared= `r round(test.30$statistic,2)`, *df* = 4, *p*= `r round(test.30$p.value, 3)`. However, there is a significant association between categorical lateralisation on the two tasks when applying a threshold of |LI|> 20, chi-squared= `r round(test.20$statistic,2)`, *df* = 4, *p*= `r round(test.20$p.value, 3)`.
+
+\
+
+Table 3. Count of lateralisation for the dichotic listening and chimeric faces tasks depending on artibtraty cut-offs.
+```{r count.tab, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+flextable::autofit(tab.tabs, add_w = 0.1, add_h = 0.1, part = c("body", "header"))
+```
+*Note*. L= left lateralisation; B= bilateral lateralisation; R= Right lateralisation.
+
+\
+
+In conclusion, it is clear that using an arbitrary cut-off to define lateralisation and, as a consequence, bilaterality influences the pattern of results obtained when using categorical dependent measure. Next we introduce the LI_z that defines laterality using a statistical measure that does not involve an arbitrary cut-off.
+
+### Participant-level statistical analyses
+
+The above LI represents a proportion of correct responses made for sound played in each ear. An alternative approach is to compute an LIz score (Parker et al., 2020) using the proportion of right and left responses. The formula is:
+ 
+z = (pL-.5)/sqrt((pL*pR)/n)
+ 
+where pR is the proportion of R responses, pL is proportion of L responses, and n is total L and R responses. The benefits of this approach is that the LIz can be interpreted as a *z*-score where a |LIz|< 1.96 indicates significant lateralisation at the *p*< 0.05 level when using a two-tailed test. Let us again consider our hypothetical case where a participant correctly identified 112 stimuli presented to their right ear and 8 presented to their left ear. The LI for this participant is calculated as follows:
+
+z= ((8/120) - .5) /  sqrt(( (8/120) * (112/120) ) / 120)
+
+z= (0.067 - .5) / sqrt((0.067 * 0.933) / 120)
+
+z= -19.03
+
+The *p*-value associated with the LIz is highly significant (*p*< 0.001). In Table 4, Table 1 is updated by adding LIz and the associated *p*-value. We can now see that fewer participants are considered to be lateralised overall. However, it gives us faith that there is consistent lateralisation in those that are lateralised. 
+
+\
+
+Table 4. Simulated LIz the dichotic listening tasks.
+```{r table4, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+sim$LIz <- round(( (sim$`Left ear`/120) -.5)/sqrt(( (sim$`Left ear`/120) * (sim$`Right ear`/120) /120)), 2)
+sim$`p value` <- round(2*pnorm(-abs(sim$LIz)), 3)
+# table
+fit <- flextable::flextable(sim)
+fit <- flextable::autofit(fit, add_w = 0.1, add_h = 0.1, part = c("body", "header"))
+fit <- flextable::color(fit, i= c(5), color = "red")
+fit <- flextable::color(fit, i= c(2, 3, 4, 7, 8), color = "blue")
+flextable::align(fit, align= "center")
+
+# corr
+DL.DL <- ggplot(dich.dat, aes(x=dich.dat$Day1_DL_acc_LI, y=dich.dat$Day1_Dich_acc_Z)) + 
+  geom_point(color="black", fill="#69b3a2", shape=22, alpha=0.4,size=4, stroke = .5)+ 
+  geom_rug(color= "#69b3a2") +
+  theme_bw(20) + ylab("Dichotic listening LIz") + xlab("Dichotic listening LI") + ylim(-40, 40)
+ggsave("plots/dichotic_LI_LIz.png", plot= DL.DL, dpi= 600, width= 6, height= 6)
+
+# correlate
+LIz.cor <- cor(dich.dat$Day1_DL_acc_LI, dich.dat$Day1_Dich_acc_Z, use= "complete.obs")
+
+# code LIz
+dich.dat$LatZ <- cut(dich.dat$Day1_Dich_acc_Z, breaks = c(-Inf, -1.96, 1.96, Inf), labels = c("Right", "Bilat", "Left"), right = FALSE)
+```
+
+\
+
+Again, by looking at the data presented Parker et al. (2020) we can examine how see how the typical LI measure correlates with LIz scores. From Figure 3 we can see that the two are clearly related (*r*= `r round(LIz.cor, 2)`). We can now use LIs scores to categorise those as left, right, and bilateral where |LIs|< 1.96 are lateralised in a given direction. In doing so we see that `r nrow(dich.dat[dich.dat$LatZ== "Left",])` participants (`r round(nrow(dich.dat[dich.dat$LatZ== "Left",])/433 *100,1)`%) are left lateralised, `r nrow(dich.dat[dich.dat$LatZ== "Bilat",])` (`r round(nrow(dich.dat[dich.dat$LatZ== "Bilat",])/433 *100,1)`%) are bilateral, and  `r nrow(dich.dat[dich.dat$LatZ== "Right",])` (`r round(nrow(dich.dat[dich.dat$LatZ== "Right",])/433 *100,1)`%) are right lateralised.
+
+\
+
+![Figure 3. Scatterplot for LI and LIz on the dichotic listening task.](./plots/dichotic_LI_LIz.png){width=300px}
+
+\
+
+```{r z.chi, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+dich.dat$DL.LatZ <- cut(dich.dat$Day1_Dich_acc_Z, breaks = c(-Inf, -1.96, 1.96, Inf), labels = c("Right", "Bilat", "Left"), right = FALSE)
+dich.dat$CF.LatZ <- cut(dich.dat$Day1_CF_acc_Z, breaks = c(-Inf, -1.96, 1.96, Inf), labels = c("Right", "Bilat", "Left"), right = FALSE)
+
+# write in table
+zTab <- table(dich.dat$CF.LatZ, dich.dat$DL.LatZ)
+# test
+test.z <- chisq.test(zTab)
+# prepare to plot
+zTab <- data.frame(cbind(zTab))
+zTab$`Chimeric faces` <- c("CF left", "CF bilat", "CF right")
+zTab <- zTab[, c(4,1,2,3)]
+
+LIz.tab <- data.frame(matrix(ncol= 4, nrow=3))
+  colnames(LIz.tab) <- c(" ", "DL left", "DL bilat", "DL right")
+LIz.tab$` ` <- zTab$`Chimeric faces`
+LIz.tab$`DL left` <- zTab$Left
+LIz.tab$`DL bilat` <- zTab$Bilat
+LIz.tab$`DL right` <- zTab$Right
+```
+
+As with the typical LIs, we can look at the relationship between laterality indices using LIz scores using the dichotic listening and chimeric faces data reported by Parker et al. (2020). Table 5 shows the count of lateralisation on the both tasks. A chi-squared test indicated no association between lateralisation across tasks, chi-squared = `r round(test.z$statistic,2)`, *df* = 4, *p*= `r round(test.z$p.value, 3)`. This largely echoes the pattern of results reported earlier, but this time no arbitrary threshold had to be decided. 
+
+\
+
+Table 5. Count of lateralisation for the dichotic listening and chimeric faces tasks using LIz scores.
+```{r table5, echo=FALSE,include=TRUE, comment=FALSE, warning=FALSE}
+fit5 <- flextable::flextable(LIz.tab)
+flextable::autofit(fit5, add_w = 0.1, add_h = 0.1, part = c("body", "header"))
+```
+
+\
+
+### Summary
+
+As seen in this document we can apply a number of arbitrary cutoffs to define lateralisation and bilaterality. Applying these cutoffs can have influence the conclusions we form about the relationship between LIs when viewing laterality as distinct categories. Here LIz scores are used to highlight how researchers can apply a statistical approach to defining laterality that is statistically significant in either direction. However, this approach may be conservative in defining lateralisation.
+
+### References
+
+Bradshaw, A. R., Bishop, D. V., & Woodhead, Z. V. (2017). Methodological considerations in assessment of language lateralisation with fMRI: a systematic review. *PeerJ*, *5*, e3557.
+
+Deblaere, K., Boon, P. A., Vandemaele, P., Tieleman, A., Vonck, K., Vingerhoets, G., ... & Achten, E. (2004). MRI language dominance assessment in epilepsy patients at 1.0 T: region of interest analysis and comparison with intracarotid amytal testing. *Neuroradiology*, *46*, 413-420.
+
+Parker, A. J., Woodhead, Z. V. J., Thompson, P. A., & Bishop, D. V. M. (2020, August 7). Assessing the reliability of an online behavioural laterality battery: A pre-registered study. https://doi.org/10.31234/osf.io/sb824
+
+Springer, J. A., Binder, J. R., Hammeke, T. A., Swanson, S. J., Frost, J. A., Bellgowan, P. S., ... & Mueller, W. M. (1999). Language dominance in neurologically normal and epilepsy subjects: a functional MRI study. *Brain*, *122*, 2033-2046.
